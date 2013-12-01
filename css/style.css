@@ -1,0 +1,37 @@
+body 
+{
+	font-family: Verdana, Arial, Sans-Serif;
+	font-size: 0.9em;
+}
+
+h1 
+{
+	font-family: Georgia, Times New Roman, Serif;
+}
+
+#main 
+{
+	width: 600px;
+	margin: auto;
+}
+
+label 
+{
+	display: block;
+	margin-top: 10px;
+	margin-bottom: 4px;
+}
+
+textarea.source 
+{
+	width: 400px;
+	height: 100px;	
+}
+
+div.preview  {
+	width: 400px;
+	height: 200px;
+	border: solid 1px #000;
+	background-color: #ffffec;
+	padding: 5px;
+}
