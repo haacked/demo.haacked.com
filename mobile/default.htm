@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>Mobile Playground</title>
+    <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.6.2.min.js"></script>
+    <script src="http://ajax.aspnetcdn.com/ajax/modernizr/modernizr-2.0.6-development-only.js"></script>
+    <script>
+        $(function () {
+            if (Modernizr.touch) {
+                $('#message').text('touch enabled!');
+            }
+            else {
+                $('#message').text('no touch for you!');
+            }
+
+            if (Modernizr.applicationcache) {
+                $('#message').append(' Offline enabled!');
+            }
+            else {
+                $('#message').append(' no offline for you!');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="message">
+    </div>
+</body>
+</html>

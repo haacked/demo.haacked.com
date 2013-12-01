@@ -1,0 +1,471 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+      "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <link rel="stylesheet" href="../css/qunit.css" type="text/css"/>
+    <script type="text/javascript" src="../lib/jquery-1.3.2.min.js"></script>
+    <script type="text/javascript" src="../lib/qunit.js"></script>
+    <script type="text/javascript" src="../src/jquery.undoable.js"></script>
+    <script type="text/javascript">
+        $(function() {
+            function colorToHex(color) {
+                if (color.substr(0, 1) === '#') {
+                    return color;
+                }
+                var digits = /(.*?)rgb\((\d+), (\d+), (\d+)\)/.exec(color);
+
+                var red = parseInt(digits[2]);
+                var green = parseInt(digits[3]);
+                var blue = parseInt(digits[4]);
+
+                var rgb = blue | (green << 8) | (red << 16);
+                return digits[1] + '#' + rgb.toString(16);
+            };
+
+            module("When initializing plugin");
+
+            test("plugin returns click source", function() {
+                // arrange
+                $('body').append('<div id="baz" style="display: none;"><p><a href="#foo">click me</a></p></div>');
+
+                // act
+                var undoable = $('#baz a').undoable();
+
+                // assert
+                equals(undoable[0], $('#baz a')[0]);
+                $('#baz').remove();
+            });
+
+            test("The plugin method exists", function() {
+                // arrange
+                $('body').append('<div id="foo" style="display: none;"></div>');
+
+                // assert
+                ok($('#foo').undoable);
+                $('#foo').remove();
+            });
+
+            module("When clicked");
+
+            test("target is located", function() {
+                // arrange
+                $('body').append('<div id="bar" style="display: none;"></div>');
+                var called = false;
+                var fn = $.fn.undoable.getTarget;
+                $.fn.undoable.getTarget = function() { called = true; return $('#bar'); };
+                $('#bar').undoable({ getPostData: function() { } });
+
+                // act
+                $('#bar').click();
+
+                // assert
+                ok(called);
+                $.fn.undoable.getTarget = fn;
+                $('#bar').remove();
+            });
+
+            test("post data is retrieved", function() {
+                // arrange
+                $('body').append('<div id="beernuts" style="display: none;"><a href="#123">hide</a></div>');
+                var called = false;
+                var fn = $.fn.undoable.getPostData;
+                var fnTarget = $.fn.undoable.getTarget;
+                $.fn.undoable.getTarget = function() { return $('#beernuts'); };
+                $.fn.undoable.getPostData = function() { called = true; return { subject: '', predicate: '' }; };
+
+                // act
+                $('#beernuts a').undoable().click();
+
+                // assert
+                ok(called);
+                $.fn.undoable.getPostData = fn;
+                $.fn.undoable.getTarget = fnTarget;
+                $('#beernuts').remove();
+            });
+
+            module("getTarget on an anchor tag");
+
+            test("defaults to using the closest DIV element with a class of 'target'", function() {
+                // arrange
+                $('body').append('<div id="thud" class="target" style="display: none;"><div><p><a href="#123">close</a></p></div></div>');
+                var anchor = $('#thud a');
+
+                // act
+                var target = $.fn.undoable.getTarget(anchor);
+
+                // assert
+                ok(target[0], $('#thud')[0]);
+                $('#thud').remove();
+            });
+
+            test("defaults to using the parent tr element if no element defined in the href", function() {
+                // arrange
+                $('body').append('<table id="qux" style="display: none;"> \
+                    <tr><td><a href="#">delete</a></td></tr></table>');
+                var anchor = $('#qux a');
+
+                // act
+                var target = $.fn.undoable.getTarget(anchor);
+
+                // assert
+                ok(target[0], $('#qux tr')[0]);
+                $('#qux').remove();
+            });
+
+            module("options");
+
+            test("allows overriding the getTarget method", function() {
+                // arrange
+                $('body').append('<table id="fred" style="display: none;"> \
+                    <tr><td><a href="#">remove</a></td></tr></table>');
+                var overriden = false;
+                $('#fred a').undoable({
+                    getTarget: function() { overriden = true; return $('#fred tr'); }
+                });
+
+                // act
+                $('#fred a').click();
+
+                // assert
+                $('#fred').remove();
+                ok(overriden);
+            });
+
+            test("allows overriding the showUndo method", function() {
+                // arrange
+                $('body').append('<table id="jane" style="display: none;"> \
+                    <tr><td><a href="#">remove</a></td></tr></table>');
+                var overriden = false;
+                $('#jane a').undoable({
+                    getTarget: function() { return $('#jane tr'); },
+                    showUndo: function() { overriden = true; return $('#jane tr'); }
+                });
+
+                // act
+                $('#jane a').click();
+
+                // assert
+                $('#jane').remove();
+                ok(overriden);
+            });
+
+            test("allows overriding the formatMessage method", function() {
+                // arrange
+                $('body').append('<table id="plugh" style="display: none;"> \
+                    <tr><td><a href="#123">get rid of</a></td></tr></table>');
+                var overriden = false;
+
+                // act
+                $.fn.undoable.showUndo($('#plugh tr'), {
+                    subject: '',
+                    predicate: ''
+                }, {
+                    formatStatus: function() { overriden = true; }
+                });
+
+                // assert
+                $('#plugh').remove();
+                ok(overriden);
+            });
+
+            test("allows overriding the applyUndoableStyle method", function() {
+                // arrange
+                $('body').append('<table id="quux" style="display: none;"> \
+                    <tr><td><a href="#">eliminate</a></td></tr></table>');
+                var overriden = false;
+                var tr = $('#quux tr');
+                tr.inlineStyling = true;
+
+                // act
+                $.fn.undoable.showUndo(tr, {
+                    subject: '',
+                    predicate: ''
+                }, {
+                    applyUndoableStyle: function() { overriden = true; }
+                });
+
+                // assert
+                $('#quux').remove();
+                ok(overriden);
+            });
+
+            module('showUndo');
+
+            test("applies default styles to element", function() {
+                // arrange
+                $('body').append('<div class="target" id="garply" style="display: none;"> \
+                   </div>');
+                var target = $('#garply');
+                var stylesApplied = false;
+                var fn = $.fn.undoable.applyUndoableStyle;
+                $.fn.undoable.applyUndoableStyle = function() { stylesApplied = true; };
+                target.inlineStyling = true;
+                // act
+                $.fn.undoable.showUndo(target,
+                    { subject: 'subj', predicate: "was foobar'd" },
+                    { id: 123 });
+
+                // assert
+                $.fn.undoable.applyUndoableStyle = fn;
+                $('#garply').remove();
+                $('.undoable').remove();
+                ok(stylesApplied);
+            });
+
+            test("showUndo does not apply default styles to element when inlineStyling = false", function() {
+                // arrange
+                $('body').append('<div id="jim" style="display: none;"><a href="#"></a> \
+                   </div>');
+                var target = $('#jim').undoable({ inlineStyling: false });
+                var stylesApplied = false;
+                var fn = $.fn.undoable.applyUndoableStyle;
+                $.fn.undoable.applyUndoableStyle = function() { stylesApplied = true; };
+
+                // act
+                target.undoable.showUndo(target,
+                    { subject: 'subj', predicate: 'was foobar d' },
+                    { id: 123 });
+
+                // assert
+                $('#jim').remove();
+                $('.undoable').remove();
+                ok(!stylesApplied);
+                $.fn.undoable.applyUndoableStyle = fn;
+            });
+
+            module("showUndo");
+
+            test("when target is not tr, creates new sibling empty element", function() {
+                // arrange
+                $('body').append('<div id="xyzzy" style="display: none;"> \
+                    <p> \
+                        stuff \
+                    </p>\
+                        <a href="#123">delete</a>\
+                    </div>');
+                var target = $('#xyzzy');
+
+                // act
+                $.fn.undoable.showUndo(target,
+                    { subject: 'subj', predicate: 'was foobard' },
+                    { id: 123 }, $('#xyzzy a'));
+
+                // assert
+                var status = target.next('div');
+                $('#xyzzy').remove();
+                ok(status);
+                ok(status.hasClass('undoable'));
+                status.remove();
+            });
+
+            test("when target is not tr, status has undo link", function() {
+                // arrange
+                $('body').append('<div id="removable" style="display: none;"> \
+                    <p> \
+                        stuff \
+                    </p>\
+                        <a href="#123" class="delete">delete</a>\
+                    </div>');
+                var target = $('#removable');
+
+                // act
+                $.fn.undoable.showUndo(target,
+                    { subject: 'subj', predicate: 'was foobard' },
+                    { id: 123 });
+
+                // assert
+                var status = target.next('div');
+                $('#removable').remove();
+                equals(status.find('p.undo').children('a').text(), 'undo');
+                equals(status.find('a.delete').length, 0);
+                status.remove();
+            });
+
+            test("when target is TR, creates new row with colspan", function() {
+                // arrange
+                $('body').append('<table id="corge" style="display: none;"> \
+                    <tr id="target"> \
+                        <td>one</td>\
+                        <td>two</td>\
+                        <td><a href="#">destroy</a></td>\
+                    </tr></table>');
+                var target = $('#target');
+
+                // act
+                $.fn.undoable.showUndo(target,
+                    { subject: 'subj', predicate: 'was foobar&#8217;d' },
+                    { id: 123 });
+
+                // assert
+                $('#corge').remove();
+                ok(target.next('tr'));
+                equals(target.next('tr').children('td:first').attr('colspan'), '2');
+            });
+
+            test("showUndo calls formatMessage", function() {
+                // arrange
+                $('body').append('<table id="waldo" style="display: none;"> \
+                    <tr id="target"> \
+                        <td>one</td>\
+                        <td>two</td>\
+                        <td><a href="#">eradicate</a></td>\
+                    </tr></table>');
+                var target = $('#target');
+                var fn = $.fn.undoable.formatStatus;
+                var formatted = false;
+                $.fn.undoable.formatStatus = function() { formatted = true; };
+
+                // act
+                $.fn.undoable.showUndo(target,
+                    { subject: 'item one', predicate: 'was deleted' },
+                    { id: 123 });
+
+                // assert
+                ok(formatted);
+                $('#waldo').remove();
+                $.fn.undoable.formatStatus = fn;
+            });
+
+            module("applyUndoableStyle");
+
+            test("when target is a DIV applies styling on DIV", function() {
+                // arrange
+                $('body').append('<div id="grault"></div>');
+                var target = $('#grault');
+
+                // act
+                $.fn.undoable.applyUndoableStyle(target);
+
+                // assert
+
+                equals(target.css('text-align'), 'center');
+                var bg = target.css('backgroundColor');
+                equals(colorToHex(bg), '#e0e0e0');
+                equals(colorToHex(target.css('color')), '#777777');
+                equals(colorToHex(target.css('borderTopColor')), '#bbbbbb');
+                equals(colorToHex(target.css('borderLeftColor')), '#bbbbbb');
+                equals(colorToHex(target.css('borderBottomColor')), '#cccccc');
+                $('#grault').remove();
+            });
+
+            test("when target is a TR applies styling on table cells", function() {
+                // arrange
+                $('body').append('<table id="tank" style="display: none;"> \
+                    <tr id="target"> \
+                        <td>one</td>\
+                        <td>two</td>\
+                        <td><a href="#123">obliterate</a></td>\
+                    </tr></table>');
+
+                var target = $('#tank tr');
+
+                // act
+                $.fn.undoable.applyUndoableStyle(target);
+
+                // assert
+
+                var bg = target.css('backgroundColor');
+                equals(colorToHex(bg), '#e0e0e0');
+                equals(colorToHex(target.children('td').css('color')), '#777777');
+                equals(colorToHex(target.children('td').css('borderTopColor')), '#bbbbbb');
+                equals(colorToHex(target.children('td:first').css('borderLeftColor')), '#bbbbbb');
+                equals(colorToHex(target.children('td').css('borderBottomColor')), '#cccccc');
+                $('#tank').remove();
+            });
+
+            module("formatStatus");
+
+            test("with data having subject and predicate returns formatted message", function() {
+                // arrange
+                var data = { subject: 'the item', predicate: 'was removed' };
+
+                // act
+                var message = $.fn.undoable.formatStatus(data);
+
+                // assert
+                equals(message, '<strong class="subject">the item</strong> <span class="predicate">was removed</span>'.toLowerCase());
+            });
+
+            module("getPostData");
+
+            test("with click target as anchor, uses href as id for post data", function() {
+                // arrange
+                $('body').append('<table id="plunk" style="display: none;"> \
+                        <tr id="target"> \
+                            <td>one</td>\
+                            <td>two</td>\
+                            <td><a href="#123">amputate</a></td>\
+                        </tr></table>');
+                var clickSource = $('#plunk a');
+                var target = $('#plunk tr');
+
+                // act
+                var data = $.fn.undoable.getPostData(clickSource, target);
+
+                // assert
+                equals(data.id, 123);
+                $('#plunk').remove();
+            });
+
+            test("getUndoPostData calls getPostData by default", function() {
+                // arrange
+                var fn = $.fn.undoable.getPostData;
+                var getPostDataCalled = false;
+                $.fn.undoable.getPostData = function() { getPostDataCalled = true; };
+
+                // act
+                $.fn.undoable.getUndoPostData(null, null, {});
+
+                // assert
+                $.fn.undoable.getPostData = fn;
+                ok(getPostDataCalled);
+            });
+
+            module("postToServer");
+
+            test("with null url passes default response to callback", function() {
+                // arrange
+                var response;
+
+                // act
+                $.fn.undoable.postToServer(null, { id: 123 }, function(resp) { response = resp; });
+
+                // assert
+                equals('The item', response.subject);
+                equals('has been removed', response.predicate);
+            });
+
+            test("with url calls ajax method with url", function() {
+                // arrange
+                var fn = $.ajax;
+                var called = false;
+                $.ajax = function(options) {
+                    equals(options.url, 'http://example.com/');
+                    equals(options.type, 'POST');
+                    equals(options.dataType, 'json');
+                    equals(options.data.id, 123);
+                    options.success({ subject: 'subject', predicate: 'predicate' });
+                    called = true;
+                };
+                var response;
+
+                // act
+                $.fn.undoable.postToServer('http://example.com/', { id: 123 }, function(resp) { response = resp; });
+
+                // assert
+                $.ajax = fn;
+                ok(called);
+                equals(response.subject, 'subject');
+                equals(response.predicate, 'predicate');
+            });
+        });
+    </script>
+  </head>
+  <body>
+    <h1 id="qunit-header">QUnit example</h1>
+    <h2 id="qunit-banner"></h2>
+    <h2 id="qunit-userAgent"></h2>
+    <ol id="qunit-tests">
+    </ol>
+  </body>
+</html>
